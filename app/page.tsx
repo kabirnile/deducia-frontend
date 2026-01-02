@@ -18,6 +18,18 @@ export default function Home() {
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState("");
 
+  // --- 1. AUTO-LOGIN ON LOAD ---
+  useEffect(() => {
+    const savedUser = localStorage.getItem('studentUser');
+    if (savedUser) {
+      const parsedUser = JSON.parse(savedUser);
+      setUser(parsedUser);
+      // Fetch data immediately since we know who they are
+      fetchCourses();
+      fetchTests();
+    }
+  }, []);
+
   // --- LOGIN LOGIC ---
   const handleLogin = async (e: any) => {
     e.preventDefault();
@@ -33,6 +45,9 @@ export default function Home() {
       
       if (data.success) {
         setUser(data.user);
+        // SAVE TO STORAGE
+        localStorage.setItem('studentUser', JSON.stringify(data.user));
+        
         fetchCourses();
         fetchTests(); 
       } else {
@@ -42,6 +57,14 @@ export default function Home() {
       setError("Connection error. Server might be sleeping.");
     }
     setLoading(false);
+  };
+
+  // --- LOGOUT LOGIC ---
+  const handleLogout = () => {
+    localStorage.removeItem('studentUser'); // Clear storage
+    setUser(null); // Reset state
+    setCourses([]);
+    setTests([]);
   };
 
   // --- SAFER DATA FETCHING ---
@@ -128,7 +151,7 @@ export default function Home() {
              </div>
              <div className="flex-1 min-w-0">
                <p className="text-sm font-medium text-gray-900 truncate">{user.full_name || "Student"}</p>
-               <p className="text-xs text-gray-500 truncate cursor-pointer hover:text-red-600" onClick={() => setUser(null)}>Logout</p>
+               <p className="text-xs text-gray-500 truncate cursor-pointer hover:text-red-600" onClick={handleLogout}>Logout</p>
              </div>
            </div>
         </div>
@@ -209,7 +232,6 @@ export default function Home() {
                        <p className="text-sm text-gray-500">Duration: {test.duration_minutes} Mins • Questions: Mixed</p>
                      </div>
                      
-                     {/* FIX: THIS IS THE NEW LINKED BUTTON */}
                      <a href={`/test/${test.id}`} className="bg-green-600 text-white px-6 py-2 rounded-lg font-bold hover:bg-green-700 transition">
                        Attempt Now
                      </a>
