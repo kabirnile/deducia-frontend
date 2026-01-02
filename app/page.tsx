@@ -126,7 +126,10 @@ export default function Home() {
                 </div>
                 <div className="p-4">
                   <h3 className="font-bold text-lg text-gray-800">{course.title}</h3>
-                  <button className="mt-4 w-full bg-blue-600 text-white py-2 rounded">Start Learning</button>
+                 {/* OLD BUTTON WAS HERE. REPLACE WITH THIS LINK: */}
+<a href={`/course/${course.id}`} className="block mt-4 text-center w-full bg-blue-600 text-white py-2 rounded hover:bg-blue-700">
+  Start Learning
+</a>
                 </div>
               </div>
             ))}
