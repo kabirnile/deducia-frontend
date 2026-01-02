@@ -260,23 +260,45 @@ export default function Home() {
             )}
 
             {/* === AI CHAT (SMARTER) === */}
-            {activeTab === "AI_CHAT" && (
-                <div className="bg-white rounded-xl shadow-lg border flex flex-col h-[80vh] overflow-hidden">
-                    <div className="bg-purple-600 text-white p-4 font-bold flex justify-between">
-                        <span>🤖 Deducia AI</span>
-                    </div>
-                    <div className="flex-1 overflow-y-auto p-4 space-y-4 bg-gray-50">
-                        {chatHistory.map((msg, i) => (
-                            <div key={i} className={`flex ${msg.role === 'user' ? 'justify-end' : 'justify-start'}`}>
-                                <div className={`max-w-[75%] p-3 rounded-2xl ${msg.role === 'user' ? 'bg-purple-600 text-white rounded-tr-none' : 'bg-white border rounded-tl-none shadow-sm'}`}>{msg.text}</div>
-                            </div>
-                        ))}
-                    </div>
-                    <div className="p-4 bg-white border-t flex gap-2">
-                        <input value={chatInput} onChange={(e) => setChatInput(e.target.value)} onKeyDown={(e) => e.key === 'Enter' && handleSendMessage()} placeholder="Type 'Physics', 'Price', 'Test'..." className="flex-1 border p-3 rounded-full outline-none" />
-                        <button onClick={handleSendMessage} className="bg-purple-600 text-white w-12 h-12 rounded-full font-bold">➤</button>
-                    </div>
-                </div>
+           // --- REAL GEMINI CHAT LOGIC ---
+  const handleSendMessage = async () => {
+    if (!chatInput.trim()) return;
+
+    // 1. Add User Message to UI immediately
+    const newHistory = [...chatHistory, { role: 'user', text: chatInput }];
+    setChatHistory(newHistory);
+    const userMessage = chatInput;
+    setChatInput(""); // Clear input box
+
+    // 2. Add a temporary "Thinking..." bubble
+    const loadingHistory = [...newHistory, { role: 'ai', text: "Thinking..." }];
+    setChatHistory(loadingHistory);
+
+    try {
+      // 3. Call OUR Backend API (not Google directly)
+      const res = await fetch('/api/chat', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ message: userMessage }),
+      });
+
+      const data = await res.json();
+
+      // 4. Replace "Thinking..." with Real Answer
+      setChatHistory(prev => [
+        ...prev.slice(0, -1), // Remove the last "Thinking..." message
+        { role: 'ai', text: data.reply }
+      ]);
+
+    } catch (error) {
+      // Handle Error
+      setChatHistory(prev => [
+        ...prev.slice(0, -1),
+        { role: 'ai', text: "Sorry, I am having trouble connecting to the server." }
+      ]);
+    }
+  };
+            
             )}
 
              {/* === OTHER TABS (Same as before) === */}
