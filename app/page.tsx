@@ -9,7 +9,7 @@ const API_BASE = process.env.NEXT_PUBLIC_API_URL ?
 export default function Home() {
   const [user, setUser] = useState<any>(null);
   
-  // Auth States
+  // Auth State
   const [phone, setPhone] = useState("");
   const [fullName, setFullName] = useState("");
   const [isNewUser, setIsNewUser] = useState(false);
