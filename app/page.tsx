@@ -1,7 +1,6 @@
 "use client";
 import { useState, useEffect } from 'react';
 
-// Environment Variable Logic
 const API_BASE = process.env.NEXT_PUBLIC_API_URL ? 
     process.env.NEXT_PUBLIC_API_URL.replace('/api/courses', '') : 
     ""; 
@@ -9,297 +8,247 @@ const API_BASE = process.env.NEXT_PUBLIC_API_URL ?
 export default function Home() {
   const [user, setUser] = useState<any>(null);
   
-  // Login/Signup States
+  // Login States
   const [phone, setPhone] = useState("");
-  const [fullName, setFullName] = useState(""); // For new users
-  const [isNewUser, setIsNewUser] = useState(false); // Controls the flow
+  const [fullName, setFullName] = useState("");
+  const [isNewUser, setIsNewUser] = useState(false);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState("");
 
   // Data States
-  const [courses, setCourses] = useState<any[]>([]); 
+  const [allCourses, setAllCourses] = useState<any[]>([]); 
+  const [myCourses, setMyCourses] = useState<any[]>([]); // PERSONALIZED
   const [tests, setTests] = useState<any[]>([]); 
-  const [activeTab, setActiveTab] = useState("BATCHES"); 
+  const [myScores, setMyScores] = useState<any[]>([]);   // PERSONALIZED
 
-  // --- 1. AUTO-LOGIN ON LOAD ---
+  const [activeTab, setActiveTab] = useState("STUDY"); // Default to My Study
+
+  // --- AUTO-LOGIN ---
   useEffect(() => {
     const savedUser = localStorage.getItem('studentUser');
     if (savedUser) {
       const parsedUser = JSON.parse(savedUser);
       setUser(parsedUser);
-      fetchCourses();
-      fetchTests();
+      loadUserData(parsedUser.id);
     }
   }, []);
 
-  // --- 2. SMART LOGIN/SIGNUP LOGIC ---
-  const handleAuth = async (e: any) => {
-    e.preventDefault();
-    setLoading(true);
-    setError("");
+  // --- FETCH ALL DATA ---
+  const loadUserData = (userId: number) => {
+    // 1. Get All Courses (For Explore)
+    fetch(`${API_BASE}/api/courses`).then(res=>res.json()).then(data => setAllCourses(Array.isArray(data)?data:[]));
+    
+    // 2. Get All Tests
+    fetch(`${API_BASE}/api/tests`).then(res=>res.json()).then(data => setTests(Array.isArray(data)?data:[]));
 
-    if (!isNewUser) {
-        // --- ATTEMPT LOGIN ---
-        try {
-            const res = await fetch(`${API_BASE}/api/login`, {
-                method: 'POST',
-                headers: { 'Content-Type': 'application/json' },
-                body: JSON.stringify({ phone }),
-            });
-            const data = await res.json();
+    // 3. Get MY Batches (Personal)
+    fetch(`${API_BASE}/api/my-batches?student_id=${userId}`)
+        .then(res=>res.json())
+        .then(data => setMyCourses(Array.isArray(data)?data:[]));
 
-            if (data.success) {
-                completeLogin(data.user);
-            } else {
-                // USER NOT FOUND -> SWITCH TO SIGNUP MODE
-                setIsNewUser(true);
-                setLoading(false);
-            }
-        } catch (err) {
-            setError("Connection error.");
-            setLoading(false);
-        }
-    } else {
-        // --- ATTEMPT SIGNUP (Create Account) ---
-        try {
-            const res = await fetch(`${API_BASE}/api/signup`, {
-                method: 'POST',
-                headers: { 'Content-Type': 'application/json' },
-                body: JSON.stringify({ phone, full_name: fullName }),
-            });
-            const data = await res.json();
-
-            if (data.success) {
-                completeLogin(data.user);
-            } else {
-                setError(data.message || "Signup failed");
-                setLoading(false);
-            }
-        } catch (err) {
-            setError("Signup error.");
-            setLoading(false);
-        }
-    }
+    // 4. Get MY Scores (Personal)
+    fetch(`${API_BASE}/api/my-results?student_id=${userId}`)
+        .then(res=>res.json())
+        .then(data => setMyScores(Array.isArray(data)?data:[]));
   };
 
-  const completeLogin = (userData: any) => {
-    setUser(userData);
-    localStorage.setItem('studentUser', JSON.stringify(userData));
+  // --- AUTH LOGIC (Same as before) ---
+  const handleAuth = async (e: any) => {
+    e.preventDefault();
+    setLoading(true); setError("");
+
+    const endpoint = isNewUser ? '/api/signup' : '/api/login';
+    const payload = isNewUser ? { phone, full_name: fullName } : { phone };
+
+    try {
+        const res = await fetch(`${API_BASE}${endpoint}`, {
+            method: 'POST',
+            headers: {'Content-Type': 'application/json'},
+            body: JSON.stringify(payload)
+        });
+        const data = await res.json();
+        if (data.success) {
+            setUser(data.user);
+            localStorage.setItem('studentUser', JSON.stringify(data.user));
+            loadUserData(data.user.id);
+        } else {
+            if (!isNewUser && endpoint.includes('login')) setIsNewUser(true);
+            else setError(data.message || "Error");
+        }
+    } catch(err) { setError("Connection Failed"); }
     setLoading(false);
-    fetchCourses();
-    fetchTests();
+  };
+
+  // --- ENROLL LOGIC ---
+  const handleEnroll = async (courseId: number) => {
+    if(!confirm("Join this batch for free?")) return;
+    await fetch(`${API_BASE}/api/enroll`, {
+        method: 'POST',
+        headers: {'Content-Type': 'application/json'},
+        body: JSON.stringify({ student_id: user.id, course_id: courseId })
+    });
+    alert("Batch Joined! Check 'Study' tab.");
+    loadUserData(user.id); // Refresh lists
   };
 
   const handleLogout = () => {
     localStorage.removeItem('studentUser');
     setUser(null);
-    setIsNewUser(false);
-    setPhone("");
-    setFullName("");
   };
 
-  // --- DATA FETCHING ---
-  const fetchCourses = () => {
-    fetch(`${API_BASE}/api/courses`).then(res => res.json())
-      .then(data => Array.isArray(data) ? setCourses(data) : setCourses([]))
-      .catch(() => setCourses([]));
-  };
-  const fetchTests = () => {
-    fetch(`${API_BASE}/api/tests`).then(res => res.json())
-      .then(data => Array.isArray(data) ? setTests(data) : setTests([]))
-      .catch(() => setTests([]));
-  };
-
-  // --- VIEW 1: AUTH SCREEN (Login + Signup combined) ---
+  // --- LOGIN UI ---
   if (!user) {
     return (
       <div className="flex min-h-screen items-center justify-center bg-gray-50 font-sans">
-        <div className="w-full max-w-md bg-white p-8 rounded-xl shadow-lg border border-gray-100">
-          
-          <div className="text-center mb-8">
-            <h1 className="text-3xl font-extrabold text-gray-900">
-                {isNewUser ? "Create Profile" : "Welcome"}
-            </h1>
-            <p className="text-gray-500 mt-2">
-                {isNewUser ? "Enter your name to complete signup" : "Enter your mobile number to continue"}
-            </p>
-          </div>
-
-          <form onSubmit={handleAuth} className="space-y-5">
-            {/* Phone Input (Always Visible) */}
-            <div>
-              <label className="text-xs font-bold text-gray-500 uppercase tracking-wide">Mobile Number</label>
-              <input 
-                type="text" 
-                placeholder="Enter 10 digit number" 
-                className="w-full mt-1 rounded-lg border border-gray-300 px-4 py-3 focus:border-purple-600 outline-none transition bg-gray-50"
-                value={phone}
-                onChange={(e) => setPhone(e.target.value)}
-                disabled={isNewUser} // Lock phone if we are asking for name
-              />
-            </div>
-
-            {/* Name Input (Only Visible if New User) */}
-            {isNewUser && (
-                <div className="animate-fade-in-down">
-                    <label className="text-xs font-bold text-gray-500 uppercase tracking-wide">Full Name</label>
-                    <input 
-                        type="text" 
-                        placeholder="e.g. Rahul Sharma" 
-                        className="w-full mt-1 rounded-lg border border-gray-300 px-4 py-3 focus:border-purple-600 outline-none transition"
-                        value={fullName}
-                        onChange={(e) => setFullName(e.target.value)}
-                        autoFocus
-                    />
-                </div>
-            )}
-
-            {error && <p className="text-red-500 text-sm text-center">{error}</p>}
-
-            <button 
-              type="submit" 
-              disabled={loading}
-              className="w-full bg-purple-600 text-white font-bold py-3 rounded-lg hover:bg-purple-700 transition disabled:bg-purple-300"
-            >
-              {loading ? "Processing..." : (isNewUser ? "Let's Study 🚀" : "Get OTP")}
-            </button>
-
-            {/* Back Button for Signup */}
-            {isNewUser && (
-                <button 
-                    type="button" 
-                    onClick={() => setIsNewUser(false)} 
-                    className="w-full text-sm text-gray-400 hover:text-gray-600"
-                >
-                    Use a different number
-                </button>
-            )}
-          </form>
+        <div className="w-full max-w-md bg-white p-8 rounded-xl shadow-lg">
+            <h1 className="text-3xl font-bold text-center mb-6">{isNewUser ? "Create Profile" : "Login"}</h1>
+            <form onSubmit={handleAuth} className="space-y-4">
+                <input value={phone} onChange={e=>setPhone(e.target.value)} placeholder="Mobile Number" className="w-full border p-3 rounded" />
+                {isNewUser && <input value={fullName} onChange={e=>setFullName(e.target.value)} placeholder="Full Name" className="w-full border p-3 rounded" />}
+                <button type="submit" disabled={loading} className="w-full bg-purple-600 text-white p-3 rounded font-bold">{loading?"Processing...":"Continue"}</button>
+                {error && <p className="text-red-500 text-center">{error}</p>}
+            </form>
         </div>
       </div>
     );
   }
 
-  // --- VIEW 2: DASHBOARD (Identical to before) ---
+  // --- DASHBOARD UI ---
   return (
     <div className="flex h-screen bg-gray-50 font-sans text-gray-800">
+      {/* SIDEBAR */}
       <aside className="w-64 bg-white border-r border-gray-200 hidden md:flex flex-col fixed h-full z-10">
         <div className="h-16 flex items-center px-6 border-b border-gray-100">
-          <span className="text-2xl font-bold text-gray-900">Deducia<span className="text-purple-600">.</span></span>
+            <span className="text-2xl font-bold">Deducia.</span>
         </div>
-        <nav className="flex-1 p-4 space-y-1 overflow-y-auto">
-          <div className="text-xs font-semibold text-gray-400 uppercase px-3 mb-2 mt-2">Academics</div>
-          <SidebarItem icon={<BookOpenIcon />} label="STUDY" active={activeTab === "STUDY"} onClick={() => setActiveTab("STUDY")} />
-          <SidebarItem icon={<LayersIcon />} label="BATCHES" active={activeTab === "BATCHES"} onClick={() => setActiveTab("BATCHES")} />
-          <SidebarItem icon={<ClipboardCheckIcon />} label="TEST SERIES" active={activeTab === "TEST SERIES"} onClick={() => setActiveTab("TEST SERIES")} />
-          <div className="pt-4 mt-4 border-t border-gray-100">
-             <div className="text-xs font-semibold text-gray-400 uppercase px-3 mb-2">Explore</div>
-             <SidebarItem icon={<ShoppingBagIcon />} label="STORE" active={activeTab === "STORE"} onClick={() => setActiveTab("STORE")} />
-             <SidebarItem icon={<BuildingIcon />} label="OFFLINE CENTRES" />
-          </div>
+        <nav className="p-4 space-y-1">
+            <div className="text-xs font-bold text-gray-400 px-3 mt-2">MY ZONE</div>
+            <SidebarItem label="My Study" icon="📚" active={activeTab==="STUDY"} onClick={()=>setActiveTab("STUDY")} />
+            <SidebarItem label="Test Performance" icon="📊" active={activeTab==="PERFORMANCE"} onClick={()=>setActiveTab("PERFORMANCE")} />
+            
+            <div className="text-xs font-bold text-gray-400 px-3 mt-6">EXPLORE</div>
+            <SidebarItem label="All Batches" icon="🌍" active={activeTab==="BATCHES"} onClick={()=>setActiveTab("BATCHES")} />
+            <SidebarItem label="Test Series" icon="📝" active={activeTab==="TEST SERIES"} onClick={()=>setActiveTab("TEST SERIES")} />
         </nav>
-        <div className="p-4 border-t border-gray-100">
-           <div className="flex items-center gap-3">
-             <div className="h-10 w-10 rounded-full bg-purple-100 flex items-center justify-center text-purple-700 font-bold">
-               {user.full_name ? user.full_name[0] : "S"}
-             </div>
-             <div className="flex-1 min-w-0">
-               <p className="text-sm font-medium text-gray-900 truncate">{user.full_name || "Student"}</p>
-               <p className="text-xs text-gray-500 truncate cursor-pointer hover:text-red-600" onClick={handleLogout}>Logout</p>
-             </div>
-           </div>
+        <div className="mt-auto p-4 border-t">
+            <div className="flex items-center gap-3">
+                <div className="w-10 h-10 bg-purple-100 rounded-full flex items-center justify-center font-bold text-purple-700">{user.full_name[0]}</div>
+                <div>
+                    <p className="text-sm font-bold">{user.full_name}</p>
+                    <button onClick={handleLogout} className="text-xs text-red-500 hover:underline">Logout</button>
+                </div>
+            </div>
         </div>
       </aside>
 
-      <main className="flex-1 md:ml-64 flex flex-col h-screen overflow-hidden">
-        <header className="h-16 bg-white border-b border-gray-200 flex items-center justify-between px-4 md:px-8 shrink-0">
-          <h1 className="text-lg font-bold text-gray-800">{activeTab}</h1>
-          <div className="hidden md:flex flex-1 max-w-xl ml-4">
-             <div className="relative w-full">
-               <input type="text" placeholder="Search..." className="w-full bg-gray-100 border-none rounded-md py-2 px-4 pl-10 text-sm focus:ring-2 focus:ring-purple-500 outline-none" />
-               <span className="absolute left-3 top-2.5 text-gray-400">🔍</span>
-             </div>
-          </div>
-        </header>
+      {/* MAIN CONTENT */}
+      <main className="flex-1 md:ml-64 p-8 overflow-y-auto">
+        <h1 className="text-2xl font-bold mb-6">{activeTab === "STUDY" ? `👋 Hi ${user.full_name}, Let's Study!` : activeTab}</h1>
 
-        <div className="flex-1 overflow-y-auto p-4 md:p-8 bg-gray-50">
-          {(activeTab === "BATCHES" || activeTab === "STUDY") && (
-            <>
-                <div className="bg-gradient-to-r from-emerald-800 to-emerald-600 rounded-2xl p-6 md:p-10 text-white mb-8 shadow-lg relative overflow-hidden">
-                    <div className="relative z-10">
-                    <h2 className="text-3xl font-bold mb-2">Year End Sale!</h2>
-                    <p className="text-emerald-100 mb-6">Get 50% off on all UPSC 2027 Batches. Offer ends soon.</p>
-                    <button className="bg-white text-emerald-800 px-6 py-2 rounded-lg font-bold hover:bg-emerald-50 transition">Explore Batches</button>
+        {/* --- TAB: MY STUDY (Enrolled Batches) --- */}
+        {activeTab === "STUDY" && (
+            <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
+                {myCourses.length === 0 ? (
+                    <div className="col-span-full text-center py-20 bg-white rounded-xl border border-dashed">
+                        <p className="text-xl text-gray-400">You haven't joined any batches yet.</p>
+                        <button onClick={()=>setActiveTab("BATCHES")} className="mt-4 text-purple-600 font-bold hover:underline">Explore Batches →</button>
                     </div>
-                    <div className="absolute top-0 right-0 -mr-10 -mt-10 w-40 h-40 bg-white opacity-10 rounded-full"></div>
-                </div>
-                <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
-                {courses.length === 0 ? (
-                     <p className="text-gray-400 col-span-full text-center">No batches found. Ask Admin to upload.</p>
-                ) : courses.map((course: any) => (
-                    <div key={course.id || Math.random()} className="bg-white rounded-xl border border-gray-200 shadow-sm hover:shadow-md transition-shadow duration-200 overflow-hidden flex flex-col">
-                    <div className="h-48 bg-gray-200 relative">
-                        <img src={course.thumbnail_url || "https://placehold.co/600x400"} alt={course.title} className="w-full h-full object-cover"/>
-                        <div className="absolute top-3 left-3 bg-purple-600 text-white text-xs font-bold px-2 py-1 rounded">LIVE</div>
-                    </div>
-                    <div className="p-5 flex-1 flex flex-col">
-                        <h3 className="font-bold text-lg text-gray-900 mb-2 line-clamp-2">{course.title}</h3>
-                        <div className="flex items-center gap-2 text-sm text-gray-500 mb-4">
-                        <span>🗓️ Starts Today</span>
-                        <span>•</span>
-                        <span>Hinglish</span>
-                        </div>
-                        <div className="mt-auto pt-4 border-t border-gray-100">
-                        <a href={`/course/${course.id}`} className="block w-full text-center bg-purple-600 text-white font-semibold py-2.5 rounded-lg hover:bg-purple-700 transition">
-                            Resume Learning
-                        </a>
-                        </div>
-                    </div>
-                    </div>
+                ) : myCourses.map(course => (
+                    <CourseCard key={course.id} course={course} isEnrolled={true} />
                 ))}
-                </div>
-            </>
-          )}
+            </div>
+        )}
 
-          {activeTab === "TEST SERIES" && (
-             <div className="space-y-4">
-               {tests.length === 0 ? (
-                 <div className="text-center py-20 text-gray-500">
-                    <p className="text-xl">📝 No active tests found.</p>
-                 </div>
-               ) : (
-                 tests.map((test: any) => (
-                   <div key={test.id || Math.random()} className="bg-white p-6 rounded-xl border border-gray-200 shadow-sm flex justify-between items-center hover:shadow-md transition">
-                     <div>
-                       <h3 className="text-lg font-bold text-gray-900">{test.title}</h3>
-                       <p className="text-sm text-gray-500">Duration: {test.duration_minutes} Mins • Questions: Mixed</p>
-                     </div>
-                     <a href={`/test/${test.id}`} className="bg-green-600 text-white px-6 py-2 rounded-lg font-bold hover:bg-green-700 transition">
-                       Attempt Now
-                     </a>
-                   </div>
-                 ))
-               )}
-             </div>
-          )}
-          {activeTab === "STORE" && <div className="text-center mt-20 text-gray-400">Store Coming Soon</div>}
-        </div>
+        {/* --- TAB: ALL BATCHES (Explore) --- */}
+        {activeTab === "BATCHES" && (
+            <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
+                {allCourses.map(course => {
+                    const isEnrolled = myCourses.some(c => c.id === course.id);
+                    return (
+                        <div key={course.id} className="bg-white rounded-xl shadow-sm border overflow-hidden flex flex-col">
+                            <img src={course.thumbnail_url} className="h-40 object-cover bg-gray-200" />
+                            <div className="p-4 flex-1 flex flex-col">
+                                <h3 className="font-bold text-lg mb-2">{course.title}</h3>
+                                <div className="mt-auto">
+                                    {isEnrolled ? (
+                                        <button disabled className="w-full bg-green-100 text-green-700 py-2 rounded font-bold">✅ Joined</button>
+                                    ) : (
+                                        <button onClick={()=>handleEnroll(course.id)} className="w-full bg-purple-600 text-white py-2 rounded font-bold hover:bg-purple-700">Join Batch</button>
+                                    )}
+                                </div>
+                            </div>
+                        </div>
+                    );
+                })}
+            </div>
+        )}
+
+        {/* --- TAB: TEST SERIES (Take Tests) --- */}
+        {activeTab === "TEST SERIES" && (
+            <div className="space-y-4">
+                {tests.map(test => {
+                    const myScore = myScores.find(s => s.test_id === test.id);
+                    return (
+                        <div key={test.id} className="bg-white p-6 rounded-xl shadow-sm border flex justify-between items-center">
+                            <div>
+                                <h3 className="font-bold text-lg">{test.title}</h3>
+                                <p className="text-gray-500 text-sm">{test.duration_minutes} Mins</p>
+                            </div>
+                            {myScore ? (
+                                <div className="text-right">
+                                    <span className="block text-sm text-gray-500">Your Score</span>
+                                    <span className="text-2xl font-bold text-blue-600">{myScore.score}/{myScore.total_marks}</span>
+                                </div>
+                            ) : (
+                                <a href={`/test/${test.id}`} className="bg-green-600 text-white px-6 py-2 rounded font-bold hover:bg-green-700">Attempt</a>
+                            )}
+                        </div>
+                    );
+                })}
+            </div>
+        )}
+
+         {/* --- TAB: PERFORMANCE (Stats) --- */}
+         {activeTab === "PERFORMANCE" && (
+            <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
+                <div className="bg-white p-6 rounded-xl shadow-sm border">
+                    <h3 className="text-gray-500 font-bold text-xs uppercase">Tests Taken</h3>
+                    <p className="text-4xl font-extrabold text-blue-600 mt-2">{myScores.length}</p>
+                </div>
+                <div className="bg-white p-6 rounded-xl shadow-sm border">
+                    <h3 className="text-gray-500 font-bold text-xs uppercase">Batches Joined</h3>
+                    <p className="text-4xl font-extrabold text-purple-600 mt-2">{myCourses.length}</p>
+                </div>
+            </div>
+         )}
+
       </main>
     </div>
   );
 }
 
-// --- ICONS ---
-function SidebarItem({ icon, label, active, onClick }: any) {
-  return (
-    <div onClick={onClick} className={`flex items-center gap-3 px-4 py-3 rounded-lg cursor-pointer transition ${active ? 'bg-purple-50 text-purple-700 font-medium' : 'text-gray-600 hover:bg-gray-50 hover:text-gray-900'}`}>
-      <span className="w-5 h-5">{icon}</span>
-      <span className="text-sm">{label}</span>
-    </div>
-  );
+// --- HELPER COMPONENTS ---
+function SidebarItem({ label, icon, active, onClick }: any) {
+    return (
+        <div onClick={onClick} className={`flex items-center gap-3 px-4 py-3 rounded cursor-pointer ${active ? 'bg-purple-50 text-purple-700 font-bold' : 'text-gray-600 hover:bg-gray-50'}`}>
+            <span>{icon}</span>
+            <span>{label}</span>
+        </div>
+    );
 }
-const BookOpenIcon = () => <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" strokeWidth={1.5} stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" d="M12 6.042A8.967 8.967 0 006 3.75c-1.052 0-2.062.18-3 .512v14.25A8.987 8.987 0 016 18c2.305 0 4.408.867 6 2.292m0-14.25a8.966 8.966 0 016-2.292c1.052 0 2.062.18 3 .512v14.25A8.987 8.987 0 0018 18a8.967 8.967 0 00-6 2.292m0-14.25v14.25" /></svg>;
-const LayersIcon = () => <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" strokeWidth={1.5} stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" d="M3.75 6.75h16.5M3.75 12h16.5m-16.5 5.25h16.5" /></svg>;
-const ClipboardCheckIcon = () => <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" strokeWidth={1.5} stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" d="M11.35 3.836c-.065.21-.1.433-.1.664 0 .414.336.75.75.75h4.5a.75.75 0 00.75-.75 2.25 2.25 0 00-.1-.664m-5.8 0A2.251 2.251 0 0113.5 2.25H15c1.012 0 1.867.668 2.15 1.586m-5.8 0c-.376.023-.75.05-1.124.08C9.095 4.01 8.25 4.973 8.25 6.108V8.25m0 0H4.875c-.621 0-1.125.504-1.125 1.125v11.25c0 .621.504 1.125 1.125 1.125h9.75c.621 0 1.125-.504 1.125-1.125V9.375c0-.621-.504-1.125-1.125-1.125H8.25zM6.75 12h.008v.008H6.75V12zm0 3h.008v.008H6.75V15zm0 3h.008v.008H6.75V18z" /></svg>;
-const ShoppingBagIcon = () => <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" strokeWidth={1.5} stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" d="M15.75 10.5V6a3.75 3.75 0 10-7.5 0v4.5m11.356-1.993l1.263 12c.07.665-.45 1.243-1.119 1.243H4.25a1.125 1.125 0 01-1.12-1.243l1.264-12A1.125 1.125 0 015.513 7.5h12.974c.576 0 1.059.435 1.119 1.007zM8.625 10.5a.375.375 0 11-.75 0 .375.375 0 01.75 0zm7.5 0a.375.375 0 11-.75 0 .375.375 0 01.75 0z" /></svg>;
-const BuildingIcon = () => <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" strokeWidth={1.5} stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" d="M12 21v-8.25M15.75 21v-8.25M8.25 21v-8.25M3 9l9-6 9 6m-1.5 12V10.332A48.36 48.36 0 0012 9.75c-2.551 0-5.056.2-7.5.582V21M3 21h18M12 6.75h.008v.008H12V6.75z" /></svg>;
+
+function CourseCard({ course, isEnrolled }: any) {
+    return (
+        <div className="bg-white rounded-xl shadow-sm border overflow-hidden flex flex-col">
+            <img src={course.thumbnail_url} className="h-40 object-cover bg-gray-200" />
+            <div className="p-4 flex-1 flex flex-col">
+                <h3 className="font-bold text-lg mb-2">{course.title}</h3>
+                <div className="mt-auto">
+                    <a href={`/course/${course.id}`} className="block w-full text-center bg-blue-600 text-white py-2 rounded font-bold hover:bg-blue-700">
+                        {isEnrolled ? "Resume Learning ▶" : "View Details"}
+                    </a>
+                </div>
+            </div>
+        </div>
+    );
+}
