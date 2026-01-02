@@ -8,15 +8,18 @@ const API_BASE = process.env.NEXT_PUBLIC_API_URL ?
 
 export default function Home() {
   const [user, setUser] = useState<any>(null);
+  
+  // Login/Signup States
   const [phone, setPhone] = useState("");
-  
-  // Safe State Initialization
-  const [courses, setCourses] = useState<any[]>([]); 
-  const [tests, setTests] = useState<any[]>([]); 
-  
-  const [activeTab, setActiveTab] = useState("BATCHES"); 
+  const [fullName, setFullName] = useState(""); // For new users
+  const [isNewUser, setIsNewUser] = useState(false); // Controls the flow
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState("");
+
+  // Data States
+  const [courses, setCourses] = useState<any[]>([]); 
+  const [tests, setTests] = useState<any[]>([]); 
+  const [activeTab, setActiveTab] = useState("BATCHES"); 
 
   // --- 1. AUTO-LOGIN ON LOAD ---
   useEffect(() => {
@@ -24,126 +27,177 @@ export default function Home() {
     if (savedUser) {
       const parsedUser = JSON.parse(savedUser);
       setUser(parsedUser);
-      // Fetch data immediately since we know who they are
       fetchCourses();
       fetchTests();
     }
   }, []);
 
-  // --- LOGIN LOGIC ---
-  const handleLogin = async (e: any) => {
+  // --- 2. SMART LOGIN/SIGNUP LOGIC ---
+  const handleAuth = async (e: any) => {
     e.preventDefault();
     setLoading(true);
     setError("");
-    try {
-      const res = await fetch(`${API_BASE}/api/login`, {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ phone: phone }),
-      });
-      const data = await res.json();
-      
-      if (data.success) {
-        setUser(data.user);
-        // SAVE TO STORAGE
-        localStorage.setItem('studentUser', JSON.stringify(data.user));
-        
-        fetchCourses();
-        fetchTests(); 
-      } else {
-        setError(data.message || "Login failed");
-      }
-    } catch (err) {
-      setError("Connection error. Server might be sleeping.");
+
+    if (!isNewUser) {
+        // --- ATTEMPT LOGIN ---
+        try {
+            const res = await fetch(`${API_BASE}/api/login`, {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({ phone }),
+            });
+            const data = await res.json();
+
+            if (data.success) {
+                completeLogin(data.user);
+            } else {
+                // USER NOT FOUND -> SWITCH TO SIGNUP MODE
+                setIsNewUser(true);
+                setLoading(false);
+            }
+        } catch (err) {
+            setError("Connection error.");
+            setLoading(false);
+        }
+    } else {
+        // --- ATTEMPT SIGNUP (Create Account) ---
+        try {
+            const res = await fetch(`${API_BASE}/api/signup`, {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({ phone, full_name: fullName }),
+            });
+            const data = await res.json();
+
+            if (data.success) {
+                completeLogin(data.user);
+            } else {
+                setError(data.message || "Signup failed");
+                setLoading(false);
+            }
+        } catch (err) {
+            setError("Signup error.");
+            setLoading(false);
+        }
     }
+  };
+
+  const completeLogin = (userData: any) => {
+    setUser(userData);
+    localStorage.setItem('studentUser', JSON.stringify(userData));
     setLoading(false);
+    fetchCourses();
+    fetchTests();
   };
 
-  // --- LOGOUT LOGIC ---
   const handleLogout = () => {
-    localStorage.removeItem('studentUser'); // Clear storage
-    setUser(null); // Reset state
-    setCourses([]);
-    setTests([]);
+    localStorage.removeItem('studentUser');
+    setUser(null);
+    setIsNewUser(false);
+    setPhone("");
+    setFullName("");
   };
 
-  // --- SAFER DATA FETCHING ---
+  // --- DATA FETCHING ---
   const fetchCourses = () => {
-    fetch(`${API_BASE}/api/courses`)
-      .then((res) => res.json())
-      .then((data) => {
-        if (Array.isArray(data)) setCourses(data);
-        else setCourses([]);
-      })
-      .catch((err) => setCourses([]));
+    fetch(`${API_BASE}/api/courses`).then(res => res.json())
+      .then(data => Array.isArray(data) ? setCourses(data) : setCourses([]))
+      .catch(() => setCourses([]));
   };
-
   const fetchTests = () => {
-    fetch(`${API_BASE}/api/tests`)
-      .then((res) => res.json())
-      .then((data) => {
-        if (Array.isArray(data)) setTests(data);
-        else setTests([]); 
-      })
-      .catch((err) => setTests([]));
+    fetch(`${API_BASE}/api/tests`).then(res => res.json())
+      .then(data => Array.isArray(data) ? setTests(data) : setTests([]))
+      .catch(() => setTests([]));
   };
 
-  // --- VIEW 1: LOGIN SCREEN ---
+  // --- VIEW 1: AUTH SCREEN (Login + Signup combined) ---
   if (!user) {
     return (
       <div className="flex min-h-screen items-center justify-center bg-gray-50 font-sans">
         <div className="w-full max-w-md bg-white p-8 rounded-xl shadow-lg border border-gray-100">
+          
           <div className="text-center mb-8">
-            <h1 className="text-3xl font-extrabold text-gray-900">Welcome Back</h1>
-            <p className="text-gray-500 mt-2">Enter your registered number to continue learning</p>
+            <h1 className="text-3xl font-extrabold text-gray-900">
+                {isNewUser ? "Create Profile" : "Welcome"}
+            </h1>
+            <p className="text-gray-500 mt-2">
+                {isNewUser ? "Enter your name to complete signup" : "Enter your mobile number to continue"}
+            </p>
           </div>
-          <form onSubmit={handleLogin} className="space-y-5">
+
+          <form onSubmit={handleAuth} className="space-y-5">
+            {/* Phone Input (Always Visible) */}
             <div>
+              <label className="text-xs font-bold text-gray-500 uppercase tracking-wide">Mobile Number</label>
               <input 
                 type="text" 
-                placeholder="Mobile Number" 
-                className="w-full rounded-lg border border-gray-300 px-4 py-3 focus:border-purple-600 focus:ring-purple-600 outline-none transition"
+                placeholder="Enter 10 digit number" 
+                className="w-full mt-1 rounded-lg border border-gray-300 px-4 py-3 focus:border-purple-600 outline-none transition bg-gray-50"
                 value={phone}
                 onChange={(e) => setPhone(e.target.value)}
+                disabled={isNewUser} // Lock phone if we are asking for name
               />
             </div>
+
+            {/* Name Input (Only Visible if New User) */}
+            {isNewUser && (
+                <div className="animate-fade-in-down">
+                    <label className="text-xs font-bold text-gray-500 uppercase tracking-wide">Full Name</label>
+                    <input 
+                        type="text" 
+                        placeholder="e.g. Rahul Sharma" 
+                        className="w-full mt-1 rounded-lg border border-gray-300 px-4 py-3 focus:border-purple-600 outline-none transition"
+                        value={fullName}
+                        onChange={(e) => setFullName(e.target.value)}
+                        autoFocus
+                    />
+                </div>
+            )}
+
             {error && <p className="text-red-500 text-sm text-center">{error}</p>}
+
             <button 
               type="submit" 
               disabled={loading}
               className="w-full bg-purple-600 text-white font-bold py-3 rounded-lg hover:bg-purple-700 transition disabled:bg-purple-300"
             >
-              {loading ? "Verifying..." : "Login Securely"}
+              {loading ? "Processing..." : (isNewUser ? "Let's Study 🚀" : "Get OTP")}
             </button>
+
+            {/* Back Button for Signup */}
+            {isNewUser && (
+                <button 
+                    type="button" 
+                    onClick={() => setIsNewUser(false)} 
+                    className="w-full text-sm text-gray-400 hover:text-gray-600"
+                >
+                    Use a different number
+                </button>
+            )}
           </form>
         </div>
       </div>
     );
   }
 
-  // --- VIEW 2: PW-STYLE DASHBOARD ---
+  // --- VIEW 2: DASHBOARD (Identical to before) ---
   return (
     <div className="flex h-screen bg-gray-50 font-sans text-gray-800">
-      
-      {/* 1. LEFT SIDEBAR */}
       <aside className="w-64 bg-white border-r border-gray-200 hidden md:flex flex-col fixed h-full z-10">
         <div className="h-16 flex items-center px-6 border-b border-gray-100">
           <span className="text-2xl font-bold text-gray-900">Deducia<span className="text-purple-600">.</span></span>
         </div>
-
         <nav className="flex-1 p-4 space-y-1 overflow-y-auto">
           <div className="text-xs font-semibold text-gray-400 uppercase px-3 mb-2 mt-2">Academics</div>
           <SidebarItem icon={<BookOpenIcon />} label="STUDY" active={activeTab === "STUDY"} onClick={() => setActiveTab("STUDY")} />
           <SidebarItem icon={<LayersIcon />} label="BATCHES" active={activeTab === "BATCHES"} onClick={() => setActiveTab("BATCHES")} />
           <SidebarItem icon={<ClipboardCheckIcon />} label="TEST SERIES" active={activeTab === "TEST SERIES"} onClick={() => setActiveTab("TEST SERIES")} />
-          
           <div className="pt-4 mt-4 border-t border-gray-100">
              <div className="text-xs font-semibold text-gray-400 uppercase px-3 mb-2">Explore</div>
              <SidebarItem icon={<ShoppingBagIcon />} label="STORE" active={activeTab === "STORE"} onClick={() => setActiveTab("STORE")} />
              <SidebarItem icon={<BuildingIcon />} label="OFFLINE CENTRES" />
           </div>
         </nav>
-
         <div className="p-4 border-t border-gray-100">
            <div className="flex items-center gap-3">
              <div className="h-10 w-10 rounded-full bg-purple-100 flex items-center justify-center text-purple-700 font-bold">
@@ -157,10 +211,7 @@ export default function Home() {
         </div>
       </aside>
 
-      {/* 2. MAIN CONTENT AREA */}
       <main className="flex-1 md:ml-64 flex flex-col h-screen overflow-hidden">
-        
-        {/* TOP HEADER */}
         <header className="h-16 bg-white border-b border-gray-200 flex items-center justify-between px-4 md:px-8 shrink-0">
           <h1 className="text-lg font-bold text-gray-800">{activeTab}</h1>
           <div className="hidden md:flex flex-1 max-w-xl ml-4">
@@ -171,15 +222,9 @@ export default function Home() {
           </div>
         </header>
 
-        {/* SCROLLABLE CONTENT */}
         <div className="flex-1 overflow-y-auto p-4 md:p-8 bg-gray-50">
-          
-          {/* LOGIC: Show content based on Sidebar Click */}
-
-          {/* === BATCHES TAB === */}
           {(activeTab === "BATCHES" || activeTab === "STUDY") && (
             <>
-                {/* HERO BANNER */}
                 <div className="bg-gradient-to-r from-emerald-800 to-emerald-600 rounded-2xl p-6 md:p-10 text-white mb-8 shadow-lg relative overflow-hidden">
                     <div className="relative z-10">
                     <h2 className="text-3xl font-bold mb-2">Year End Sale!</h2>
@@ -188,7 +233,6 @@ export default function Home() {
                     </div>
                     <div className="absolute top-0 right-0 -mr-10 -mt-10 w-40 h-40 bg-white opacity-10 rounded-full"></div>
                 </div>
-
                 <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
                 {courses.length === 0 ? (
                      <p className="text-gray-400 col-span-full text-center">No batches found. Ask Admin to upload.</p>
@@ -217,7 +261,6 @@ export default function Home() {
             </>
           )}
 
-          {/* === TEST SERIES TAB === */}
           {activeTab === "TEST SERIES" && (
              <div className="space-y-4">
                {tests.length === 0 ? (
@@ -231,20 +274,15 @@ export default function Home() {
                        <h3 className="text-lg font-bold text-gray-900">{test.title}</h3>
                        <p className="text-sm text-gray-500">Duration: {test.duration_minutes} Mins • Questions: Mixed</p>
                      </div>
-                     
                      <a href={`/test/${test.id}`} className="bg-green-600 text-white px-6 py-2 rounded-lg font-bold hover:bg-green-700 transition">
                        Attempt Now
                      </a>
-
                    </div>
                  ))
                )}
              </div>
           )}
-
-          {/* === STORE TAB === */}
           {activeTab === "STORE" && <div className="text-center mt-20 text-gray-400">Store Coming Soon</div>}
-
         </div>
       </main>
     </div>
@@ -260,7 +298,6 @@ function SidebarItem({ icon, label, active, onClick }: any) {
     </div>
   );
 }
-
 const BookOpenIcon = () => <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" strokeWidth={1.5} stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" d="M12 6.042A8.967 8.967 0 006 3.75c-1.052 0-2.062.18-3 .512v14.25A8.987 8.987 0 016 18c2.305 0 4.408.867 6 2.292m0-14.25a8.966 8.966 0 016-2.292c1.052 0 2.062.18 3 .512v14.25A8.987 8.987 0 0018 18a8.967 8.967 0 00-6 2.292m0-14.25v14.25" /></svg>;
 const LayersIcon = () => <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" strokeWidth={1.5} stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" d="M3.75 6.75h16.5M3.75 12h16.5m-16.5 5.25h16.5" /></svg>;
 const ClipboardCheckIcon = () => <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" strokeWidth={1.5} stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" d="M11.35 3.836c-.065.21-.1.433-.1.664 0 .414.336.75.75.75h4.5a.75.75 0 00.75-.75 2.25 2.25 0 00-.1-.664m-5.8 0A2.251 2.251 0 0113.5 2.25H15c1.012 0 1.867.668 2.15 1.586m-5.8 0c-.376.023-.75.05-1.124.08C9.095 4.01 8.25 4.973 8.25 6.108V8.25m0 0H4.875c-.621 0-1.125.504-1.125 1.125v11.25c0 .621.504 1.125 1.125 1.125h9.75c.621 0 1.125-.504 1.125-1.125V9.375c0-.621-.504-1.125-1.125-1.125H8.25zM6.75 12h.008v.008H6.75V12zm0 3h.008v.008H6.75V15zm0 3h.008v.008H6.75V18z" /></svg>;
