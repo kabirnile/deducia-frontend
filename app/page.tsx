@@ -9,7 +9,7 @@ const API_BASE = process.env.NEXT_PUBLIC_API_URL ?
 export default function Home() {
   const [user, setUser] = useState<any>(null);
   
-  // Auth State
+  // Auth States
   const [phone, setPhone] = useState("");
   const [fullName, setFullName] = useState("");
   const [isNewUser, setIsNewUser] = useState(false);
@@ -30,7 +30,7 @@ export default function Home() {
   // AI Chat State
   const [chatInput, setChatInput] = useState("");
   const [chatHistory, setChatHistory] = useState<any[]>([
-    { role: 'ai', text: 'Hello! I am Deducia AI. Ask me about courses, fees, physics, or chemistry!' }
+    { role: 'ai', text: 'Hello! I am Deducia AI 🤖. I am connected to Google Gemini. Ask me anything!' }
   ]);
 
   const [activeTab, setActiveTab] = useState("HOME"); 
@@ -51,7 +51,7 @@ export default function Home() {
     fetch(`${API_BASE}/api/my-results?student_id=${userId}`).then(res=>res.json()).then(data => setMyScores(Array.isArray(data)?data:[]));
   };
 
-  // --- AUTH & ENROLL (Same as before) ---
+  // --- AUTH HANDLERS ---
   const handleAuth = async (e: any) => {
     e.preventDefault();
     setLoading(true); setError("");
@@ -89,7 +89,6 @@ export default function Home() {
 
   const handleLogout = () => { localStorage.removeItem('studentUser'); setUser(null); };
 
-  // --- NEW: MENTOR REQUEST HANDLER ---
   const submitMentorRequest = async (e: any) => {
     e.preventDefault();
     setFormStatus("Sending...");
@@ -102,7 +101,6 @@ export default function Home() {
     setMentorForm({ subject: 'Physics', issue: '', time: 'Morning' });
   };
 
-  // --- NEW: CONTACT MESSAGE HANDLER ---
   const submitContact = async (e: any) => {
     e.preventDefault();
     setFormStatus("Sending...");
@@ -115,29 +113,42 @@ export default function Home() {
     setContactForm({ msg: '' });
   };
 
-  // --- NEW: SMART AI BOT 🧠 ---
-  const handleSendMessage = () => {
+  // --- REAL GEMINI CHAT LOGIC ---
+  const handleSendMessage = async () => {
     if (!chatInput.trim()) return;
-    const userMsg = chatInput.toLowerCase();
-    
-    // Add User Message
+
+    // 1. Add User Message to UI
     const newHistory = [...chatHistory, { role: 'user', text: chatInput }];
     setChatHistory(newHistory);
-    setChatInput("");
+    const userMessage = chatInput;
+    setChatInput(""); 
 
-    // AI BRAIN (Simple Rule-Based)
-    let reply = "I am not sure about that. Try asking about 'Physics', 'Batches', or 'Tests'.";
-    
-    if (userMsg.includes('hello') || userMsg.includes('hi')) reply = "Hello! How can I help you study today?";
-    else if (userMsg.includes('physics')) reply = "For Physics, I recommend starting with 'Rotational Motion' in the library. It is high weightage.";
-    else if (userMsg.includes('price') || userMsg.includes('cost') || userMsg.includes('fee')) reply = "Good news! All batches are currently 50% OFF for the Year End Sale.";
-    else if (userMsg.includes('test') || userMsg.includes('exam')) reply = "You can attempt the 'UPSC Mock Test 1' in the Test Series tab. It is live now.";
-    else if (userMsg.includes('chemistry')) reply = "Organic Chemistry notes have been updated in Chapter 4. Check the Library.";
+    // 2. Add Thinking Bubble
+    const loadingHistory = [...newHistory, { role: 'ai', text: "Thinking..." }];
+    setChatHistory(loadingHistory);
 
-    // Simulate Typing Delay
-    setTimeout(() => {
-        setChatHistory(prev => [...prev, { role: 'ai', text: reply }]);
-    }, 600);
+    try {
+      // 3. Call Backend
+      const res = await fetch('/api/chat', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ message: userMessage }),
+      });
+
+      const data = await res.json();
+
+      // 4. Update with Real Answer
+      setChatHistory(prev => [
+        ...prev.slice(0, -1), // Remove "Thinking..."
+        { role: 'ai', text: data.reply }
+      ]);
+
+    } catch (error) {
+      setChatHistory(prev => [
+        ...prev.slice(0, -1),
+        { role: 'ai', text: "Error: I cannot reach the server right now." }
+      ]);
+    }
   };
 
   // --- LOGIN UI ---
@@ -202,7 +213,6 @@ export default function Home() {
         </header>
 
         <div className="flex-1 overflow-y-auto p-8">
-            {/* === HOME === */}
             {activeTab === "HOME" && (
                 <div className="space-y-8">
                     <h1 className="text-3xl font-bold text-gray-900">Hi, {user.full_name} 👋</h1>
@@ -214,7 +224,6 @@ export default function Home() {
                 </div>
             )}
 
-            {/* === MENTOR FORM (FUNCTIONAL) === */}
             {activeTab === "MENTOR" && (
                 <div className="max-w-2xl mx-auto bg-white p-8 rounded-xl shadow-sm border">
                     <h2 className="text-2xl font-bold mb-6">Request a Mentor Session 👨‍🏫</h2>
@@ -241,7 +250,6 @@ export default function Home() {
                 </div>
             )}
 
-            {/* === CONTACT FORM (FUNCTIONAL) === */}
             {activeTab === "CONTACT" && (
                 <div className="max-w-2xl mx-auto bg-white p-8 rounded-xl shadow-sm border">
                     <h2 className="text-2xl font-bold mb-6">Contact Support 📞</h2>
@@ -259,49 +267,25 @@ export default function Home() {
                 </div>
             )}
 
-            {/* === AI CHAT (SMARTER) === */}
-           // --- REAL GEMINI CHAT LOGIC ---
-  const handleSendMessage = async () => {
-    if (!chatInput.trim()) return;
-
-    // 1. Add User Message to UI immediately
-    const newHistory = [...chatHistory, { role: 'user', text: chatInput }];
-    setChatHistory(newHistory);
-    const userMessage = chatInput;
-    setChatInput(""); // Clear input box
-
-    // 2. Add a temporary "Thinking..." bubble
-    const loadingHistory = [...newHistory, { role: 'ai', text: "Thinking..." }];
-    setChatHistory(loadingHistory);
-
-    try {
-      // 3. Call OUR Backend API (not Google directly)
-      const res = await fetch('/api/chat', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ message: userMessage }),
-      });
-
-      const data = await res.json();
-
-      // 4. Replace "Thinking..." with Real Answer
-      setChatHistory(prev => [
-        ...prev.slice(0, -1), // Remove the last "Thinking..." message
-        { role: 'ai', text: data.reply }
-      ]);
-
-    } catch (error) {
-      // Handle Error
-      setChatHistory(prev => [
-        ...prev.slice(0, -1),
-        { role: 'ai', text: "Sorry, I am having trouble connecting to the server." }
-      ]);
-    }
-  };
-            
+            {activeTab === "AI_CHAT" && (
+                <div className="bg-white rounded-xl shadow-lg border flex flex-col h-[80vh] overflow-hidden">
+                    <div className="bg-purple-600 text-white p-4 font-bold flex justify-between">
+                        <span>🤖 Deducia AI</span>
+                    </div>
+                    <div className="flex-1 overflow-y-auto p-4 space-y-4 bg-gray-50">
+                        {chatHistory.map((msg, i) => (
+                            <div key={i} className={`flex ${msg.role === 'user' ? 'justify-end' : 'justify-start'}`}>
+                                <div className={`max-w-[75%] p-3 rounded-2xl ${msg.role === 'user' ? 'bg-purple-600 text-white rounded-tr-none' : 'bg-white border rounded-tl-none shadow-sm'}`}>{msg.text}</div>
+                            </div>
+                        ))}
+                    </div>
+                    <div className="p-4 bg-white border-t flex gap-2">
+                        <input value={chatInput} onChange={(e) => setChatInput(e.target.value)} onKeyDown={(e) => e.key === 'Enter' && handleSendMessage()} placeholder="Ask me anything..." className="flex-1 border p-3 rounded-full outline-none" />
+                        <button onClick={handleSendMessage} className="bg-purple-600 text-white w-12 h-12 rounded-full font-bold">➤</button>
+                    </div>
+                </div>
             )}
 
-             {/* === OTHER TABS (Same as before) === */}
             {activeTab === "MY_BATCHES" && (
                 <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
                     {myCourses.length === 0 ? <EmptyState msg="No batches yet. Go to 'All Batches' to join one!" /> : myCourses.map(course => <CourseCard key={course.id} course={course} isEnrolled={true} />)}
