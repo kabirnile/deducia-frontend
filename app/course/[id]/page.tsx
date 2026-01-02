@@ -73,9 +73,21 @@ export default function Classroom() {
             <p className="text-gray-600 mb-6">{course.description}</p>
             
             <div className="flex gap-4">
-               <button className="px-4 py-2 bg-blue-100 text-blue-700 rounded font-medium hover:bg-blue-200">
-                 📄 Download PDF Notes
-               </button>
+              {/* SMART NOTES BUTTON */}
+{course.notes_url ? (
+  <a 
+    href={course.notes_url} 
+    target="_blank" 
+    rel="noopener noreferrer"
+    className="px-4 py-2 bg-blue-100 text-blue-700 rounded font-medium hover:bg-blue-200 flex items-center gap-2"
+  >
+    📄 Download PDF Notes
+  </a>
+) : (
+  <button disabled className="px-4 py-2 bg-gray-100 text-gray-400 rounded cursor-not-allowed">
+    🚫 No Notes Available
+  </button>
+)}
                <button className="px-4 py-2 bg-gray-100 text-gray-700 rounded font-medium hover:bg-gray-200">
                  💬 Ask a Doubt
                </button>
