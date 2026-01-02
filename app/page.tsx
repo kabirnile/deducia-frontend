@@ -22,6 +22,12 @@ export default function Home() {
   const [tests, setTests] = useState<any[]>([]); 
   const [myScores, setMyScores] = useState<any[]>([]);
   
+  // Chat State (For AI)
+  const [chatInput, setChatInput] = useState("");
+  const [chatHistory, setChatHistory] = useState<any[]>([
+    { role: 'ai', text: 'Hello! I am your AI Study Assistant. Ask me any doubt from Physics, Chemistry, or Maths!' }
+  ]);
+
   // Navigation State
   const [activeTab, setActiveTab] = useState("HOME"); 
 
@@ -84,6 +90,21 @@ export default function Home() {
     setUser(null);
   };
 
+  // --- 3. AI CHAT LOGIC ---
+  const handleSendMessage = () => {
+    if (!chatInput.trim()) return;
+    
+    // Add User Message
+    const newHistory = [...chatHistory, { role: 'user', text: chatInput }];
+    setChatHistory(newHistory);
+    setChatInput("");
+
+    // Simulate AI Response (Fake for now)
+    setTimeout(() => {
+        setChatHistory(prev => [...prev, { role: 'ai', text: "That is a great question! While I am in beta mode, please refer to the Lecture Notes in Chapter 4 for a detailed explanation. 🤖" }]);
+    }, 1000);
+  };
+
   // --- VIEW 1: LOGIN SCREEN ---
   if (!user) {
     return (
@@ -107,27 +128,37 @@ export default function Home() {
     <div className="flex h-screen bg-gray-50 font-sans text-gray-800">
       
       {/* SIDEBAR NAVIGATION */}
-      <aside className="w-64 bg-white border-r border-gray-200 hidden md:flex flex-col fixed h-full z-10">
-        <div className="h-16 flex items-center px-6 border-b border-gray-100">
+      <aside className="w-64 bg-white border-r border-gray-200 hidden md:flex flex-col fixed h-full z-10 overflow-y-auto">
+        <div className="h-16 flex items-center px-6 border-b border-gray-100 shrink-0 sticky top-0 bg-white">
           <span className="text-2xl font-bold">Deducia<span className="text-purple-600">.</span></span>
         </div>
 
-        <nav className="flex-1 p-4 space-y-1 overflow-y-auto">
+        <nav className="flex-1 p-4 space-y-1">
           {/* Main Learning */}
           <SidebarItem label="Dashboard" icon="🏠" active={activeTab==="HOME"} onClick={()=>setActiveTab("HOME")} />
           <SidebarItem label="My Batches" icon="🎓" active={activeTab==="MY_BATCHES"} onClick={()=>setActiveTab("MY_BATCHES")} />
           <SidebarItem label="Khazana" icon="💎" active={activeTab==="KHAZANA"} onClick={()=>setActiveTab("KHAZANA")} isNew={true} />
           
-          {/* Practice & Doubt */}
+          {/* AI & Mentorship */}
+          <div className="text-xs font-bold text-gray-400 px-3 mt-6 mb-2">ASSISTANCE</div>
+          <SidebarItem label="Ask AI" icon="🤖" active={activeTab==="AI_CHAT"} onClick={()=>setActiveTab("AI_CHAT")} />
+          <SidebarItem label="My Mentor" icon="👨‍🏫" active={activeTab==="MENTOR"} onClick={()=>setActiveTab("MENTOR")} />
+
+          {/* Practice */}
           <div className="text-xs font-bold text-gray-400 px-3 mt-6 mb-2">PRACTICE</div>
           <SidebarItem label="Test Series" icon="📝" active={activeTab==="TESTS"} onClick={()=>setActiveTab("TESTS")} />
-          <SidebarItem label="Doubts" icon="❓" active={activeTab==="DOUBTS"} onClick={()=>setActiveTab("DOUBTS")} />
           <SidebarItem label="Library" icon="📚" active={activeTab==="LIBRARY"} onClick={()=>setActiveTab("LIBRARY")} />
 
           {/* Explore */}
           <div className="text-xs font-bold text-gray-400 px-3 mt-6 mb-2">EXPLORE</div>
           <SidebarItem label="All Batches" icon="🌍" active={activeTab==="ALL_BATCHES"} onClick={()=>setActiveTab("ALL_BATCHES")} />
           <SidebarItem label="PW Centers" icon="🏢" active={activeTab==="CENTERS"} onClick={()=>setActiveTab("CENTERS")} />
+
+          {/* Company */}
+          <div className="text-xs font-bold text-gray-400 px-3 mt-6 mb-2">GENERAL</div>
+          <SidebarItem label="About Us" icon="ℹ️" active={activeTab==="ABOUT"} onClick={()=>setActiveTab("ABOUT")} />
+          <SidebarItem label="Contact Us" icon="📞" active={activeTab==="CONTACT"} onClick={()=>setActiveTab("CONTACT")} />
+          <SidebarItem label="Privacy Policy" icon="🔒" active={activeTab==="PRIVACY"} onClick={()=>setActiveTab("PRIVACY")} />
         </nav>
 
         <div className="p-4 border-t border-gray-100 bg-gray-50">
@@ -149,56 +180,88 @@ export default function Home() {
             <h2 className="text-lg font-bold">{activeTab.replace('_', ' ')}</h2>
             <div className="flex items-center gap-4">
                 <span className="text-2xl cursor-pointer">🔔</span>
-                <span className="text-2xl cursor-pointer">🛒</span>
             </div>
         </header>
 
         {/* DYNAMIC CONTENT */}
         <div className="flex-1 overflow-y-auto p-8">
 
-            {/* === 1. DASHBOARD HOME (Overview) === */}
+            {/* === 1. DASHBOARD HOME === */}
             {activeTab === "HOME" && (
                 <div className="space-y-8">
-                    {/* Welcome Header */}
                     <div className="flex justify-between items-end">
                         <div>
                             <h1 className="text-3xl font-bold text-gray-900">Hi, {user.full_name} 👋</h1>
                             <p className="text-gray-500">Let's continue your preparation for UPSC 2027</p>
                         </div>
                     </div>
-
-                    {/* Stats Grid */}
                     <div className="grid grid-cols-1 md:grid-cols-4 gap-4">
                         <StatCard label="Batches Joined" value={myCourses.length} color="bg-blue-100 text-blue-700" />
                         <StatCard label="Tests Attempted" value={myScores.length} color="bg-green-100 text-green-700" />
-                        <StatCard label="Hours Watched" value="12.5" color="bg-purple-100 text-purple-700" />
-                        <StatCard label="Doubts Asked" value="0" color="bg-orange-100 text-orange-700" />
+                        <StatCard label="Mentorship" value="Active" color="bg-orange-100 text-orange-700" />
+                        <StatCard label="AI Credits" value="Free" color="bg-purple-100 text-purple-700" />
                     </div>
-
-                    {/* Schedule Section */}
                     <div className="bg-white p-6 rounded-xl border shadow-sm">
                         <h3 className="font-bold text-lg mb-4">📅 Today's Schedule</h3>
                         <div className="text-center py-8 text-gray-400 border-2 border-dashed rounded-lg">
-                            No live classes scheduled for today. <br/>
-                            <span className="text-sm">Check "My Batches" for recorded lectures.</span>
+                            No live classes scheduled for today.
                         </div>
                     </div>
-
-                    {/* Continue Watching */}
-                    {myCourses.length > 0 && (
-                        <div>
-                            <h3 className="font-bold text-lg mb-4">▶ Continue Learning</h3>
-                            <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
-                                {myCourses.slice(0, 3).map(course => (
-                                    <CourseCard key={course.id} course={course} isEnrolled={true} />
-                                ))}
-                            </div>
-                        </div>
-                    )}
                 </div>
             )}
 
-            {/* === 2. MY BATCHES === */}
+            {/* === 2. AI ASK ANYTHING === */}
+            {activeTab === "AI_CHAT" && (
+                <div className="bg-white rounded-xl shadow-lg border flex flex-col h-[80vh] overflow-hidden">
+                    <div className="bg-purple-600 text-white p-4 font-bold flex justify-between">
+                        <span>🤖 Deducia AI</span>
+                        <span className="text-xs bg-white/20 px-2 py-1 rounded">BETA</span>
+                    </div>
+                    
+                    {/* Chat History */}
+                    <div className="flex-1 overflow-y-auto p-4 space-y-4 bg-gray-50">
+                        {chatHistory.map((msg, i) => (
+                            <div key={i} className={`flex ${msg.role === 'user' ? 'justify-end' : 'justify-start'}`}>
+                                <div className={`max-w-[75%] p-3 rounded-2xl ${msg.role === 'user' ? 'bg-purple-600 text-white rounded-tr-none' : 'bg-white border rounded-tl-none shadow-sm'}`}>
+                                    {msg.text}
+                                </div>
+                            </div>
+                        ))}
+                    </div>
+
+                    {/* Input Area */}
+                    <div className="p-4 bg-white border-t flex gap-2">
+                        <input 
+                            value={chatInput}
+                            onChange={(e) => setChatInput(e.target.value)}
+                            onKeyDown={(e) => e.key === 'Enter' && handleSendMessage()}
+                            placeholder="Type your doubt here..." 
+                            className="flex-1 border p-3 rounded-full focus:ring-2 ring-purple-500 outline-none" 
+                        />
+                        <button onClick={handleSendMessage} className="bg-purple-600 text-white w-12 h-12 rounded-full font-bold hover:bg-purple-700">➤</button>
+                    </div>
+                </div>
+            )}
+
+            {/* === 3. MY MENTOR === */}
+            {activeTab === "MENTOR" && (
+                <div className="max-w-4xl mx-auto">
+                    <div className="bg-gradient-to-r from-orange-500 to-red-500 text-white p-8 rounded-2xl shadow-lg mb-8">
+                        <h2 className="text-3xl font-bold mb-2">Saarthi Mentorship Program</h2>
+                        <p className="opacity-90">Get 1-on-1 guidance from UPSC Rank Holders.</p>
+                    </div>
+                    <div className="bg-white p-6 rounded-xl shadow-sm border text-center">
+                        <div className="w-24 h-24 bg-gray-200 rounded-full mx-auto mb-4 overflow-hidden">
+                            <img src="https://placehold.co/200x200" alt="Mentor" />
+                        </div>
+                        <h3 className="text-xl font-bold">Assigning Mentor...</h3>
+                        <p className="text-gray-500 mb-6">We are matching you with the best mentor based on your profile.</p>
+                        <button className="bg-orange-500 text-white px-8 py-3 rounded-lg font-bold hover:bg-orange-600">Request Call Back</button>
+                    </div>
+                </div>
+            )}
+
+            {/* === 4. MY BATCHES === */}
             {activeTab === "MY_BATCHES" && (
                 <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
                     {myCourses.length === 0 ? <EmptyState msg="No batches yet. Go to 'All Batches' to join one!" /> : 
@@ -206,16 +269,16 @@ export default function Home() {
                 </div>
             )}
 
-            {/* === 3. KHAZANA (Placeholder) === */}
+            {/* === 5. KHAZANA === */}
             {activeTab === "KHAZANA" && (
                 <div className="text-center py-20">
                     <div className="text-6xl mb-4">💎</div>
                     <h2 className="text-2xl font-bold">Welcome to Khazana</h2>
-                    <p className="text-gray-500 max-w-md mx-auto mt-2">Access India's best faculty lectures for any topic. This premium feature is unlocking soon for your account.</p>
+                    <p className="text-gray-500 max-w-md mx-auto mt-2">Premium content unlocking soon.</p>
                 </div>
             )}
 
-            {/* === 4. ALL BATCHES (Explore) === */}
+            {/* === 6. ALL BATCHES === */}
             {activeTab === "ALL_BATCHES" && (
                 <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
                     {allCourses.map(course => {
@@ -239,13 +302,13 @@ export default function Home() {
                 </div>
             )}
 
-            {/* === 5. TEST SERIES === */}
+            {/* === 7. TEST SERIES === */}
             {activeTab === "TESTS" && (
                 <div className="space-y-4">
                     {tests.map(test => {
                         const myScore = myScores.find(s => s.test_id === test.id);
                         return (
-                            <div key={test.id} className="bg-white p-6 rounded-xl shadow-sm border flex justify-between items-center hover:shadow-md transition">
+                            <div key={test.id} className="bg-white p-6 rounded-xl shadow-sm border flex justify-between items-center">
                                 <div>
                                     <h3 className="font-bold text-lg">{test.title}</h3>
                                     <p className="text-gray-500 text-sm">{test.duration_minutes} Mins • 50 Marks</p>
@@ -264,11 +327,53 @@ export default function Home() {
                 </div>
             )}
 
-            {/* === 6. DOUBTS & LIBRARY === */}
-            {(activeTab === "DOUBTS" || activeTab === "LIBRARY" || activeTab === "CENTERS") && (
+            {/* === 8. GENERAL PAGES (About, Contact, Privacy) === */}
+            {activeTab === "ABOUT" && (
+                <div className="bg-white p-10 rounded-xl shadow-sm max-w-4xl mx-auto">
+                    <h1 className="text-3xl font-bold mb-4">About Deducia</h1>
+                    <p className="text-gray-600 leading-relaxed mb-4">
+                        Deducia is India's most affordable learning platform for UPSC & JEE aspirants. 
+                        We believe that quality education should be accessible to everyone, regardless of their financial background.
+                    </p>
+                    <p className="text-gray-600 leading-relaxed">
+                        Founded in 2025, we have helped over 10,000+ students achieve their dreams.
+                    </p>
+                </div>
+            )}
+
+            {activeTab === "CONTACT" && (
+                <div className="bg-white p-10 rounded-xl shadow-sm max-w-4xl mx-auto">
+                    <h1 className="text-3xl font-bold mb-6">Contact Us</h1>
+                    <div className="grid grid-cols-1 md:grid-cols-2 gap-8">
+                        <div>
+                            <h3 className="font-bold text-lg mb-2">📍 Head Office</h3>
+                            <p className="text-gray-600">Plot No. 12, Tech Park, Aligarh, Uttar Pradesh, India - 202001</p>
+                        </div>
+                        <div>
+                            <h3 className="font-bold text-lg mb-2">📞 Support</h3>
+                            <p className="text-gray-600">Email: support@deducia.com</p>
+                            <p className="text-gray-600">Phone: +91 99999 88888</p>
+                        </div>
+                    </div>
+                </div>
+            )}
+
+            {activeTab === "PRIVACY" && (
+                <div className="bg-white p-10 rounded-xl shadow-sm max-w-4xl mx-auto">
+                    <h1 className="text-3xl font-bold mb-4">Privacy Policy</h1>
+                    <p className="text-gray-600 text-sm mb-4">Last Updated: Jan 2026</p>
+                    <div className="space-y-4 text-gray-700">
+                        <p>1. <strong>Data Collection:</strong> We collect your phone number and name solely for authentication and personalization purposes.</p>
+                        <p>2. <strong>Data Usage:</strong> We do not sell your data to third parties.</p>
+                        <p>3. <strong>Security:</strong> All your test scores and learning progress are stored securely.</p>
+                    </div>
+                </div>
+            )}
+
+            {/* === 9. UNDER CONSTRUCTION === */}
+            {(activeTab === "LIBRARY" || activeTab === "CENTERS") && (
                 <div className="text-center py-20 text-gray-400">
                     <p className="text-xl">🚧 Feature Under Construction</p>
-                    <p className="text-sm mt-2">We are building this {activeTab.toLowerCase()} module for you.</p>
                 </div>
             )}
 
@@ -279,7 +384,6 @@ export default function Home() {
 }
 
 // --- SUB-COMPONENTS ---
-
 function SidebarItem({ label, icon, active, onClick, isNew }: any) {
     return (
         <div onClick={onClick} className={`flex items-center gap-3 px-4 py-3 rounded-lg cursor-pointer transition select-none ${active ? 'bg-purple-50 text-purple-700 font-bold' : 'text-gray-600 hover:bg-gray-50'}`}>
@@ -289,7 +393,6 @@ function SidebarItem({ label, icon, active, onClick, isNew }: any) {
         </div>
     );
 }
-
 function StatCard({ label, value, color }: any) {
     return (
         <div className={`p-6 rounded-xl border ${color.replace('text-', 'border-').replace('100', '200')} bg-white`}>
@@ -298,7 +401,6 @@ function StatCard({ label, value, color }: any) {
         </div>
     );
 }
-
 function CourseCard({ course, isEnrolled }: any) {
     return (
         <div className="bg-white rounded-xl shadow-sm border overflow-hidden flex flex-col hover:shadow-md transition">
@@ -318,7 +420,6 @@ function CourseCard({ course, isEnrolled }: any) {
         </div>
     );
 }
-
 function EmptyState({ msg }: any) {
     return (
         <div className="col-span-full text-center py-20 bg-white rounded-xl border border-dashed">
