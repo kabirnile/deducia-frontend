@@ -208,9 +208,12 @@ export default function Home() {
                        <h3 className="text-lg font-bold text-gray-900">{test.title}</h3>
                        <p className="text-sm text-gray-500">Duration: {test.duration_minutes} Mins • Questions: Mixed</p>
                      </div>
-                    <a href={`/test/${test.id}`} className="bg-green-600 text-white px-6 py-2 rounded-lg font-bold hover:bg-green-700 transition">
-  Attempt Now
-</a>
+                     
+                     {/* FIX: THIS IS THE NEW LINKED BUTTON */}
+                     <a href={`/test/${test.id}`} className="bg-green-600 text-white px-6 py-2 rounded-lg font-bold hover:bg-green-700 transition">
+                       Attempt Now
+                     </a>
+
                    </div>
                  ))
                )}
