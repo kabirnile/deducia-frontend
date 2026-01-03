@@ -50,6 +50,8 @@ export default function Home() {
     fetch(`${API_BASE}/api/tests`).then(res=>res.json()).then(data => setTests(Array.isArray(data)?data:[]));
     fetch(`${API_BASE}/api/my-batches?student_id=${userId}`).then(res=>res.json()).then(data => setMyCourses(Array.isArray(data)?data:[]));
     fetch(`${API_BASE}/api/my-results?student_id=${userId}`).then(res=>res.json()).then(data => setMyScores(Array.isArray(data)?data:[]));
+      fetch(`${API_BASE}/api/notes`).then(res=>res.json()).then(data => setLibraryNotes(Array.isArray(data)?data:[]));
+    
   };
 
   // --- AUTH HANDLERS ---
