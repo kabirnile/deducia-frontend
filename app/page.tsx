@@ -21,6 +21,7 @@ export default function Home() {
   const [myCourses, setMyCourses] = useState<any[]>([]); 
   const [tests, setTests] = useState<any[]>([]); 
   const [myScores, setMyScores] = useState<any[]>([]);
+    const [libraryNotes, setLibraryNotes] = useState<any[]>([]);
   
   // Feature Forms States
   const [mentorForm, setMentorForm] = useState({ subject: 'Physics', issue: '', time: 'Morning' });
