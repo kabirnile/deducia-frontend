@@ -2,42 +2,43 @@ import { NextResponse } from 'next/server';
 
 export async function POST(req: Request) {
   try {
-    // 1. Get the user's message from the frontend
     const { message } = await req.json();
+    const apiKey = process.env.GEMINI_API_KEY;
 
-    // 2. Prepare the payload for Gemini
-    const payload = {
-      contents: [
-        {
-          parts: [
-            { text: message } // The user's question
-          ]
-        }
-      ]
-    };
+    // CHECK 1: Is the API Key actually loaded?
+    if (!apiKey) {
+      return NextResponse.json({ reply: "🚨 Error: Vercel cannot find 'GEMINI_API_KEY'. Please check your Environment Variables and Redeploy." });
+    }
 
-    // 3. Send to Google's Gemini API (using gemini-1.5-flash for speed)
+    // CHECK 2: Send to Google
     const response = await fetch(
-      `https://generativelanguage.googleapis.com/v1beta/models/gemini-1.5-flash:generateContent?key=${process.env.GEMINI_API_KEY}`,
+      `https://generativelanguage.googleapis.com/v1beta/models/gemini-1.5-flash:generateContent?key=${apiKey}`,
       {
         method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-        },
-        body: JSON.stringify(payload),
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          contents: [{ parts: [{ text: message }] }]
+        }),
       }
     );
 
     const data = await response.json();
 
-    // 4. Extract the text answer
-    const aiResponse = data.candidates?.[0]?.content?.parts?.[0]?.text || "I couldn't generate a response.";
+    // CHECK 3: Did Google send an error back?
+    if (data.error) {
+      return NextResponse.json({ reply: `🚨 Google Error: ${data.error.message}` });
+    }
 
-    // 5. Send back to Frontend
+    // CHECK 4: Did we get a valid answer?
+    const aiResponse = data.candidates?.[0]?.content?.parts?.[0]?.text;
+    
+    if (!aiResponse) {
+       return NextResponse.json({ reply: "🚨 Error: Google sent a response, but it was empty. Debug: " + JSON.stringify(data) });
+    }
+
     return NextResponse.json({ reply: aiResponse });
 
-  } catch (error) {
-    console.error(error);
-    return NextResponse.json({ reply: "Internal Server Error" }, { status: 500 });
+  } catch (error: any) {
+    return NextResponse.json({ reply: "🚨 Server Crash: " + error.message });
   }
 }
