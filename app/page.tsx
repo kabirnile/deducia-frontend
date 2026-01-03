@@ -21,7 +21,7 @@ export default function Home() {
   const [myCourses, setMyCourses] = useState<any[]>([]); 
   const [tests, setTests] = useState<any[]>([]); 
   const [myScores, setMyScores] = useState<any[]>([]);
-    const [libraryNotes, setLibraryNotes] = useState<any[]>([]);
+  const [libraryNotes, setLibraryNotes] = useState<any[]>([]); // NEW: Notes State
   
   // Feature Forms States
   const [mentorForm, setMentorForm] = useState({ subject: 'Physics', issue: '', time: 'Morning' });
@@ -31,7 +31,7 @@ export default function Home() {
   // AI Chat State
   const [chatInput, setChatInput] = useState("");
   const [chatHistory, setChatHistory] = useState<any[]>([
-    { role: 'ai', text: 'Hello! I am Deducia AI 🤖. I am connected to Google Gemini. Ask me anything!' }
+    { role: 'ai', text: 'Hello! I am Deducia AI 🤖. Ask me anything!' }
   ]);
 
   const [activeTab, setActiveTab] = useState("HOME"); 
@@ -50,8 +50,8 @@ export default function Home() {
     fetch(`${API_BASE}/api/tests`).then(res=>res.json()).then(data => setTests(Array.isArray(data)?data:[]));
     fetch(`${API_BASE}/api/my-batches?student_id=${userId}`).then(res=>res.json()).then(data => setMyCourses(Array.isArray(data)?data:[]));
     fetch(`${API_BASE}/api/my-results?student_id=${userId}`).then(res=>res.json()).then(data => setMyScores(Array.isArray(data)?data:[]));
-      fetch(`${API_BASE}/api/notes`).then(res=>res.json()).then(data => setLibraryNotes(Array.isArray(data)?data:[]));
-    
+    // NEW: Fetch Notes
+    fetch(`${API_BASE}/api/notes`).then(res=>res.json()).then(data => setLibraryNotes(Array.isArray(data)?data:[]));
   };
 
   // --- AUTH HANDLERS ---
@@ -189,6 +189,7 @@ export default function Home() {
 
           <div className="text-xs font-bold text-gray-400 px-3 mt-6 mb-2">PRACTICE</div>
           <SidebarItem label="Test Series" icon="📝" active={activeTab==="TESTS"} onClick={()=>setActiveTab("TESTS")} />
+          <SidebarItem label="Library" icon="📚" active={activeTab==="LIBRARY"} onClick={()=>setActiveTab("LIBRARY")} />
           
           <div className="text-xs font-bold text-gray-400 px-3 mt-6 mb-2">EXPLORE</div>
           <SidebarItem label="All Batches" icon="🌍" active={activeTab==="ALL_BATCHES"} onClick={()=>setActiveTab("ALL_BATCHES")} />
@@ -223,6 +224,32 @@ export default function Home() {
                         <StatCard label="Batches Joined" value={myCourses.length} color="bg-blue-100 text-blue-700" />
                         <StatCard label="Tests Attempted" value={myScores.length} color="bg-green-100 text-green-700" />
                         <StatCard label="Mentorship" value="Active" color="bg-orange-100 text-orange-700" />
+                    </div>
+                </div>
+            )}
+
+            {/* === LIBRARY (NOTES) === */}
+            {activeTab === "LIBRARY" && (
+                <div className="space-y-6">
+                    <div className="bg-gradient-to-r from-blue-600 to-cyan-600 text-white p-8 rounded-xl shadow-lg">
+                        <h1 className="text-3xl font-bold">📚 Study Library</h1>
+                        <p className="opacity-90">Download premium notes and summaries.</p>
+                    </div>
+                    
+                    <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                        {libraryNotes.length === 0 ? <EmptyState msg="No notes uploaded yet." /> : 
+                         libraryNotes.map(note => (
+                            <div key={note.id} className="bg-white p-5 rounded-xl border shadow-sm flex items-center justify-between hover:shadow-md transition">
+                                <div className="flex items-center gap-4">
+                                    <div className="h-12 w-12 bg-red-100 text-red-600 rounded-lg flex items-center justify-center font-bold text-xl">PDF</div>
+                                    <div>
+                                        <h3 className="font-bold text-gray-800">{note.title}</h3>
+                                        <span className="text-xs bg-gray-100 px-2 py-1 rounded text-gray-500 uppercase">{note.subject}</span>
+                                    </div>
+                                </div>
+                                <a href={note.pdf_url} target="_blank" className="text-blue-600 font-bold hover:underline">Download ↓</a>
+                            </div>
+                        ))}
                     </div>
                 </div>
             )}
